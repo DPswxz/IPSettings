@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Management;
-using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
@@ -14,6 +12,7 @@ namespace WinformsIPSettings
 {
     public partial class Form1 : Form
     {
+        StringBuilder sb = new StringBuilder();
         public Form1()
         {
             InitializeComponent();
@@ -22,8 +21,12 @@ namespace WinformsIPSettings
         private void Form1_Load(object sender, EventArgs e)
         {
             InitListBox();
+            sb.Append($"{(rbtnAuto.Checked ? "Auto" : "Manual")} IP: {IpAddress.Text} ");
         }
 
+        /// <summary>
+        /// 加载网络接口
+        /// </summary>
         private void InitListBox()
         {
             listboxAdapters.Items.Clear();
@@ -42,6 +45,10 @@ namespace WinformsIPSettings
             }
         }
 
+        /// <summary>
+        /// 获取当前系统的网络配置
+        /// </summary>
+        /// <param name="desc"></param>
         private void GetNetworkConfig(string desc)
         {
             NetworkInterface[] adapters = NetworkInterface.GetAllNetworkInterfaces();
@@ -108,6 +115,10 @@ namespace WinformsIPSettings
             }
         }
 
+        /// <summary>
+        /// 自动获取IP
+        /// </summary>
+        /// <param name="adapter"></param>
         private void SetAutoIP(NetworkInterface adapter)
         {
             ManagementClass mc = new ManagementClass("Win32_NetworkAdapterConfiguration");
@@ -126,6 +137,14 @@ namespace WinformsIPSettings
             }
         }
 
+        /// <summary>
+        /// 手动获取IP
+        /// </summary>
+        /// <param name="desc"></param>
+        /// <param name="ip"></param>
+        /// <param name="submask"></param>
+        /// <param name="gateway"></param>
+        /// <param name="dns"></param>
         private void SetManualIP(string desc, string[] ip, string[] submask, string[] gateway, string[] dns)
         {
             var mc = new ManagementClass("Win32_NetworkAdapterConfiguration");
@@ -222,7 +241,7 @@ namespace WinformsIPSettings
 
         private void btnSet_Click(object sender, EventArgs e)
         {
-            btnSet.Enabled = false;
+            btnDefault.Enabled = false;
 
             string netInfo = listboxAdapters.SelectedItem.ToString();
             string desc = netInfo.Substring(netInfo.IndexOf(":") + 2);
@@ -237,9 +256,9 @@ namespace WinformsIPSettings
 
                     return;
                 }
-                SetManualIP(desc, new[] { IpAddress.Text }, new[] { SubnetMask.Text }, new[] { Gateway.Text },
+                SetManualIP(desc, new[] { IpAddress.Text }, new[] { SubnetMask.Text }, new[] { Gateway.Text }, 
                     new[] { PrimaryDNS.Text, BackupDNS.Text });
-                btnSet.Enabled = true;
+                btnDefault.Enabled = true;
             }
             else
             {
@@ -252,15 +271,63 @@ namespace WinformsIPSettings
                     }
                     SetAutoIP(adapter);
                 }
-                GetNetworkConfig(desc);
-                btnSet.Enabled = true;
-                MessageBox.Show("已设置自动获取！");
+                btnDefault.Enabled = true;
+                if (DialogResult.OK == MessageBox.Show("已设置自动获取！", "", MessageBoxButtons.OK, MessageBoxIcon.Information))
+                {
+                    btnRefresh_Click(null, null);
+                }               
             }
-            
+
+            sb.Append($" => {(rbtnAuto.Checked ? "Auto" : "Manual")} IP: {IpAddress.Text} \n");
+            try
+            {
+                StreamWriter sw = new StreamWriter("log.txt", true);
+                sw.WriteLine($"{DateTime.Now:g}  {sb}");
+                sw.Close();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception: " + ex.Message);
+            }
+            finally
+            {
+                Console.WriteLine("Executing finally block.");
+            }
+            sb.Clear();
+            sb.Append($"{(rbtnAuto.Checked ? "Auto" : "Manual")} IP: {IpAddress.Text} ");
+        }
+
+        private void btnSetDefaultIP_Click(object sender, EventArgs e)
+        {
+            Form2 form = new Form2();
+            form.ShowDialog();
+        }
+
+        private void btnFill_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                StreamReader sr = new StreamReader("fillIP.txt");
+                rbtnAuto.Checked = false;
+                rbtnManual.Checked = true;
+                IpAddress.Text = sr.ReadLine();
+                SubnetMask.Text = sr.ReadLine();
+                sr.Close();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception: " + ex.Message);
+            }
+        }
+
+        private void btnOpenLog_Click(object sender, EventArgs e)
+        {
+            Process.Start("notepad.exe", "log.txt");
         }
 
         private void listboxAdapters_SelectedIndexChanged(object sender, EventArgs e)
         {
+
             string netInfo = listboxAdapters.SelectedItem.ToString();
             string desc = netInfo.Substring(netInfo.IndexOf(":") + 2);
             ClearLabelResult();
@@ -269,19 +336,15 @@ namespace WinformsIPSettings
 
         private void rbtnAuto_CheckedChanged(object sender, EventArgs e)
         {
-            if (rbtnAuto.Checked) 
-            { 
+            if (rbtnAuto.Checked)
+            {
                 IpAddress.ReadOnly = true;
                 SubnetMask.ReadOnly = true;
                 Gateway.ReadOnly = true;
                 PrimaryDNS.ReadOnly = true;
                 BackupDNS.ReadOnly = true;
             }
-        }
-
-        private void rbtnManual_CheckedChanged(object sender, EventArgs e)
-        {
-            if (rbtnManual.Checked)
+            else
             {
                 IpAddress.ReadOnly = false;
                 SubnetMask.ReadOnly = false;
@@ -289,8 +352,7 @@ namespace WinformsIPSettings
                 PrimaryDNS.ReadOnly = false;
                 BackupDNS.ReadOnly = false;
             }
+            ClearLabelResult();
         }
-
-
     }
 }
