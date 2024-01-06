@@ -33,11 +33,12 @@ namespace WinformsIPSettings
 
             foreach (NetworkInterface adapter in NetworkInterface.GetAllNetworkInterfaces())
             {
-                var addr = adapter.GetIPProperties().GatewayAddresses.FirstOrDefault();
-                if (addr != null)
-                {
-                    listboxAdapters.Items.Add($"{adapter.Name} : {adapter.Description}");
-                }
+                listboxAdapters.Items.Add($"{adapter.Name} : {adapter.Description}");
+                //var addr = adapter.GetIPProperties().GatewayAddresses.FirstOrDefault();
+                //if (addr != null)
+                //{
+                    
+                //}
             }
             if (listboxAdapters.Items != null)
             {
